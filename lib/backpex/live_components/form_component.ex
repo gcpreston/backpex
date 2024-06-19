@@ -177,7 +177,7 @@ defmodule Backpex.FormComponent do
     handle_item_action(socket, key, change)
   end
 
-  def handle_event("save", %{"change" => change}, socket) do
+  def handle_event("save", %{"change" => change, "return" => _}, socket) do
     %{assigns: %{live_action: live_action, fields: fields} = assigns} = socket
 
     change =
@@ -185,7 +185,18 @@ defmodule Backpex.FormComponent do
       |> put_upload_change(socket, :insert)
       |> drop_readonly_changes(fields, assigns)
 
-    handle_save(socket, live_action, change)
+    handle_save(socket, live_action, change, follow_return_to: true)
+  end
+
+  def handle_event("save", %{"change" => change, "continue-editing" => _}, socket) do
+    %{assigns: %{live_action: live_action, fields: fields} = assigns} = socket
+
+    change =
+      change
+      |> put_upload_change(socket, :insert)
+      |> drop_readonly_changes(fields, assigns)
+
+    handle_save(socket, live_action, change, follow_return_to: false)
   end
 
   def handle_event("save", %{"action-key" => key}, socket) do
@@ -206,7 +217,9 @@ defmodule Backpex.FormComponent do
     {:noreply, socket}
   end
 
-  defp handle_save(socket, :new, params) do
+  defp handle_save(socket, :new, params, opts) do
+    follow_return_to = Keyword.get(opts, :follow_return_to, true)
+
     %{
       assigns:
         %{
@@ -218,7 +231,7 @@ defmodule Backpex.FormComponent do
         } = assigns
     } = socket
 
-    opts = [
+    insert_opts = [
       assigns: assigns,
       pubsub: assigns[:pubsub],
       assocs: Map.get(assigns, :assocs, []),
@@ -230,7 +243,7 @@ defmodule Backpex.FormComponent do
       end
     ]
 
-    case Resource.insert(item, params, repo, changeset_function, opts) do
+    case Resource.insert(item, params, repo, changeset_function, insert_opts) do
       {:ok, item} ->
         return_to = live_resource.return_to(socket, assigns, :new, item)
         info_msg = Backpex.translate({"New %{resource} has been created successfully.", %{resource: singular_name}})
@@ -240,7 +253,7 @@ defmodule Backpex.FormComponent do
           |> assign(:show_form_errors, false)
           |> clear_flash()
           |> put_flash(:info, info_msg)
-          |> push_navigate(to: return_to)
+          |> maybe_push_navigate(follow_return_to, to: return_to)
 
         {:noreply, socket}
 
@@ -258,7 +271,9 @@ defmodule Backpex.FormComponent do
     end
   end
 
-  defp handle_save(socket, :edit, params) do
+  defp handle_save(socket, :edit, params, opts) do
+    follow_return_to = Keyword.get(opts, :follow_return_to, true)
+
     %{
       assigns:
         %{
@@ -270,7 +285,7 @@ defmodule Backpex.FormComponent do
         } = assigns
     } = socket
 
-    opts = [
+    update_opts = [
       assigns: assigns,
       pubsub: assigns[:pubsub],
       assocs: Map.get(assigns, :assocs, []),
@@ -282,7 +297,7 @@ defmodule Backpex.FormComponent do
       end
     ]
 
-    case Resource.update(item, params, repo, changeset_function, opts) do
+    case Resource.update(item, params, repo, changeset_function, update_opts) do
       {:ok, item} ->
         return_to = live_resource.return_to(socket, assigns, :edit, item)
         info_msg = Backpex.translate({"%{resource} has been edited successfully.", %{resource: singular_name}})
@@ -292,7 +307,7 @@ defmodule Backpex.FormComponent do
           |> assign(:show_form_errors, false)
           |> clear_flash()
           |> put_flash(:info, info_msg)
-          |> push_navigate(to: return_to)
+          |> maybe_push_navigate(follow_return_to, to: return_to)
 
         {:noreply, socket}
 
@@ -310,7 +325,9 @@ defmodule Backpex.FormComponent do
     end
   end
 
-  defp handle_save(socket, :resource_action, params) do
+  defp handle_save(socket, :resource_action, params, opts) do
+    follow_return_to = Keyword.get(opts, :follow_return_to, true)
+
     %{
       assigns:
         %{
@@ -334,7 +351,7 @@ defmodule Backpex.FormComponent do
           socket
           |> assign(:show_form_errors, false)
           |> put_flash_message(result)
-          |> push_navigate(to: return_to)
+          |> maybe_push_navigate(follow_return_to, to: return_to)
 
         {:noreply, socket}
 
@@ -445,6 +462,9 @@ defmodule Backpex.FormComponent do
   end
 
   defp handle_uploads(_socket), do: :ok
+
+  defp maybe_push_navigate(socket, false, _opts), do: socket
+  defp maybe_push_navigate(socket, true, opts), do: push_navigate(socket, opts)
 
   def render(assigns) do
     form_component(assigns)

@@ -1,4 +1,6 @@
 <div id="form-component">
+  <Backpex.HTML.Layout.flash_messages flash={@flash} />
+
   <.form
     for={@form}
     id="resource-form"
@@ -54,6 +56,15 @@
         </.link>
         <button
           type="submit"
+          name="continue-editing"
+          class={["btn", if(form_errors?(@show_form_errors, @form), do: "btn-error", else: "btn-primary")]}
+          phx-disable-with={@save_label <> "..."}
+        >
+          Save & continue editing
+        </button>
+        <button
+          type="submit"
+          name="return"
           class={["btn", if(form_errors?(@show_form_errors, @form), do: "btn-error", else: "btn-primary")]}
           phx-disable-with={@save_label <> "..."}
         >
